@@ -1,6 +1,6 @@
 """Local browser interface for the autonomous development agent.
 
-The service deliberately binds to loopback only. Do not expose it to a network:
+The service binds to loopback by default. Do not expose it to a network:
 the agent can write files and execute generated development commands.
 """
 import hmac
@@ -22,8 +22,8 @@ from agent.planner import create_plan  # noqa: E402
 from agent.reviewer import review_project  # noqa: E402
 from main import collect_project_files, collect_test_results  # noqa: E402
 
-HOST = "127.0.0.1"
-PORT = int(os.environ.get("AGENT_WEB_PORT", "8765"))
+HOST = os.environ.get("AGENT_WEB_HOST", "127.0.0.1")
+PORT = int(os.environ.get("PORT", os.environ.get("AGENT_WEB_PORT", "8765")))
 MAX_REQUEST_BYTES = 8_000
 MAX_JOBS = 100
 JOB_RETENTION_SECONDS = 60 * 60
@@ -123,6 +123,9 @@ class Handler(BaseHTTPRequestHandler):
         return True
 
     def do_GET(self):
+        if self.path == "/healthz":
+            self._send(200, {"status": "ok"})
+            return
         if self.path == "/":
             self._send(200, PAGE, "text/html; charset=utf-8")
             return
@@ -208,7 +211,7 @@ def main():
         raise SystemExit("Set AGENT_WEB_TOKEN to a random value of at least 24 characters before starting.")
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"Agent UI: http://{HOST}:{PORT}")
-    print("Network access is disabled; this service binds only to loopback.")
+    print(f"Listening on {HOST}:{PORT}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
