@@ -21,6 +21,7 @@ from agent.agent import run_agent  # noqa: E402
 from agent.planner import create_plan  # noqa: E402
 from agent.reviewer import review_project  # noqa: E402
 from main import collect_project_files, collect_test_results  # noqa: E402
+from tools.render_sandbox import job_execution  # noqa: E402
 
 HOST = os.environ.get("AGENT_WEB_HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", os.environ.get("AGENT_WEB_PORT", "8765")))
@@ -48,7 +49,7 @@ def _clean_old_jobs():
             _jobs.pop(job_id, None)
 
 
-def _run_job(job_id, request):
+def _run_job_without_runner(job_id, request):
     with _jobs_lock:
         _jobs[job_id]["status"] = "running"
         _jobs[job_id]["updated_at"] = time.time()
@@ -78,6 +79,17 @@ def _run_job(job_id, request):
     except Exception as error:
         with _jobs_lock:
             _jobs[job_id].update(status="failed", error=f"{type(error).__name__}: {error}", updated_at=time.time())
+
+
+def _run_job(job_id, request):
+    try:
+        with job_execution():
+            _run_job_without_runner(job_id, request)
+    except Exception as error:
+        with _jobs_lock:
+            job = _jobs.get(job_id)
+            if job is not None:
+                job.update(status="failed", error=f"{type(error).__name__}: {error}", updated_at=time.time())
 
 
 def _worker():
