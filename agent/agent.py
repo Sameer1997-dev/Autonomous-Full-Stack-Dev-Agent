@@ -2,12 +2,12 @@ import json
 import re
 import ollama
 
+from agent.model import get_model
 from agent.reviewer import review_project
 from tools.files import list_files, read_file, write_file
 from tools.terminal import run_command
 
 
-MODEL = "qwen2.5-coder:7b"
 MAX_STEPS = 15
 
 
@@ -477,7 +477,7 @@ Do not claim success until the relevant final test passes.
         print(f"\n--- Agent Step {step_count} ---\n")
 
         response = ollama.chat(
-            model=MODEL,
+            model=get_model(),
             messages=messages
         )
 

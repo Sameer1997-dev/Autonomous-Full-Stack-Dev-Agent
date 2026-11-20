@@ -4,7 +4,7 @@ import threading
 
 import ollama
 
-MODEL = "qwen2.5-coder:7b"
+from agent.model import get_model
 
 REVIEWER_PROMPT = """
 You are the Reviewer component of an autonomous software development agent.
@@ -328,7 +328,7 @@ Return ONLY the required JSON review.
 """
 
     response = ollama.chat(
-        model=MODEL,
+        model=get_model(),
         messages=[
             {
                 "role": "system",

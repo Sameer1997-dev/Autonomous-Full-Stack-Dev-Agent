@@ -2,8 +2,8 @@ import json
 import re
 import ollama
 
+from agent.model import get_model
 
-MODEL = "qwen2.5-coder:7b"
 
 
 PLANNER_PROMPT = """
@@ -209,7 +209,7 @@ def create_plan(request):
     """
 
     response = ollama.chat(
-        model=MODEL,
+        model=get_model(),
         messages=[
             {
                 "role": "system",

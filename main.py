@@ -1,5 +1,9 @@
+import argparse
 import json
+import os
+import sys
 
+from agent.model import DEFAULT_MODEL, get_model
 from agent.planner import create_plan
 from agent.agent import run_agent
 from agent.reviewer import review_project
@@ -48,8 +52,38 @@ def collect_test_results(agent_result):
     }
 
 
-def main():
-    request = input("\nWhat would you like me to build?\n> ")
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Plan, build, and review a project using a local Ollama model."
+    )
+    parser.add_argument(
+        "request",
+        nargs="*",
+        help="The change to build. Omit it to be prompted, or use '-' to read stdin.",
+    )
+    parser.add_argument(
+        "--model",
+        help=f"Ollama model to use for planning, coding, and review (default: {DEFAULT_MODEL}).",
+    )
+    args = parser.parse_args(argv)
+
+    if args.model:
+        os.environ["AGENT_MODEL"] = args.model.strip()
+
+    if args.request == ["-"]:
+        request = sys.stdin.read().strip()
+    elif args.request:
+        request = " ".join(args.request).strip()
+    else:
+        try:
+            request = input("\nWhat would you like me to build?\n> ").strip()
+        except EOFError:
+            parser.error("No request was provided. Pass a request or pipe it through stdin.")
+
+    if not request:
+        parser.error("The request cannot be empty.")
+
+    print(f"\nUsing Ollama model: {get_model()}")
 
     print("\n================================")
     print("DEVELOPMENT PLAN")
