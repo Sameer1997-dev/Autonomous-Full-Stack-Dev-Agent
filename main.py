@@ -129,6 +129,10 @@ are resolved.
         print("================================")
         print(json.dumps(agent_result, indent=2))
 
+        if agent_result.get("status") != "COMPLETED":
+            print("\nThe developer agent stopped before completing the request. Review skipped.")
+            raise SystemExit(1)
+
         project_files = collect_project_files(plan)
         test_results = collect_test_results(agent_result)
 

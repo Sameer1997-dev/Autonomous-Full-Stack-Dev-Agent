@@ -39,6 +39,10 @@ TOOL FORMAT:
   "arguments": {}
 }
 
+Tool calls MUST be valid JSON. For multiline file content, encode line breaks
+as \\n inside a normal JSON string. Never use triple-quoted strings, Python
+literals, or comments. If a tool call is malformed, it will not be executed.
+
 
 For write_file:
 
@@ -286,7 +290,7 @@ def execute_tool(tool_name, arguments):
     return f"ERROR: Unknown tool: {tool_name}"
 
 
-def extract_tool_calls(content):
+def parse_tool_calls(content):
     """
     Extract JSON tool calls from the model response.
 
@@ -308,6 +312,7 @@ def extract_tool_calls(content):
     decoder = json.JSONDecoder()
 
     tool_calls = []
+    malformed_calls = 0
 
     position = 0
 
@@ -334,8 +339,15 @@ def extract_tool_calls(content):
             position = start + end
 
         except json.JSONDecodeError:
+            malformed_calls += 1
             position = start + 1
 
+    return tool_calls, malformed_calls
+
+
+def extract_tool_calls(content):
+    """Return valid tool calls while preserving the existing public helper."""
+    tool_calls, _ = parse_tool_calls(content)
     return tool_calls
 
 
@@ -471,6 +483,7 @@ Do not claim success until the relevant final test passes.
     command_results = []
     stopped_normally = False
     step_count = 0
+    awaiting_tool_retry = False
 
     for step in range(MAX_STEPS):
         step_count = step + 1
@@ -491,9 +504,32 @@ Do not claim success until the relevant final test passes.
             }
         )
 
-        tool_calls = extract_tool_calls(content)
+        tool_calls, malformed_calls = parse_tool_calls(content)
+
+        if malformed_calls:
+            awaiting_tool_retry = True
+            messages.append({
+                "role": "user",
+                "content": (
+                    f"I found {malformed_calls} malformed tool call(s). None of the "
+                    "tool calls in that response were executed. Re-emit every needed "
+                    "call as valid JSON, with multiline file contents encoded using "
+                    "\\n inside a normal quoted string. Do not use triple quotes."
+                ),
+            })
+            continue
 
         if not tool_calls:
+            if awaiting_tool_retry:
+                return {
+                    "status": "FAILED",
+                    "reason": "The model stopped after malformed tool calls; no valid tool actions were executed.",
+                    "step_count": step_count,
+                    "stopped_normally": False,
+                    "tools_executed": tools_executed,
+                    "command_results": command_results,
+                    "workspace_files": list_files(),
+                }
             stopped_normally = True
             return {
                 "status": "COMPLETED",
@@ -504,6 +540,7 @@ Do not claim success until the relevant final test passes.
                 "workspace_files": list_files(),
             }
 
+        awaiting_tool_retry = False
         results = []
         last_run_command_result = None
 
@@ -551,18 +588,18 @@ Do not claim success until the relevant final test passes.
                 print(f"Failure repetition count: {failure_count}")
 
                 if failure_count >= 2:
-                    results.append(
-                        """
-IMPORTANT:
-
-This same failure has occurred multiple times.
-
-DO NOT repeat the same command again.
-
-You MUST inspect the relevant files and make
-a meaningful correction before retrying.
-"""
-                    )
+                    return {
+                        "status": "FAILED",
+                        "reason": (
+                            f"Stopped after the same command failed {failure_count} "
+                            f"times: {command}"
+                        ),
+                        "step_count": step_count,
+                        "stopped_normally": False,
+                        "tools_executed": tools_executed,
+                        "command_results": command_results,
+                        "workspace_files": list_files(),
+                    }
 
         messages.append(
             {
