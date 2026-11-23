@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
 
+from tools.workspace import get_workspace
 
-WORKSPACE = Path("workspace").resolve()
+WORKSPACE = get_workspace()
 MAX_FILE_SIZE_BYTES = 1_000_000
 IGNORED_DIRECTORIES = {
     ".git",
@@ -20,6 +21,7 @@ IGNORED_DIRECTORIES = {
 
 
 def _workspace_path(filename):
+    workspace = get_workspace()
     normalized = str(filename).replace("\\", "/")
 
     if normalized.startswith("workspace/"):
@@ -30,10 +32,10 @@ def _workspace_path(filename):
     if candidate.is_absolute() or ".." in candidate.parts:
         raise ValueError("Path must stay inside the workspace.")
 
-    path = (WORKSPACE / candidate).resolve()
+    path = (workspace / candidate).resolve()
 
     try:
-        path.relative_to(WORKSPACE)
+        path.relative_to(workspace)
     except ValueError as error:
         raise ValueError("Path must stay inside the workspace.") from error
 
@@ -42,12 +44,13 @@ def _workspace_path(filename):
 
 def list_files():
     """Return files inside the agent workspace."""
-    if not WORKSPACE.exists():
-        WORKSPACE.mkdir(parents=True)
+    workspace = get_workspace()
+    if not workspace.exists():
+        workspace.mkdir(parents=True)
 
     files = []
 
-    for directory, child_directories, filenames in os.walk(WORKSPACE):
+    for directory, child_directories, filenames in os.walk(workspace):
         child_directories[:] = [
             name
             for name in child_directories
@@ -60,9 +63,9 @@ def list_files():
 
             if (
                 path.suffix.casefold() not in {".pyc", ".pyo"}
-                and path.resolve().is_relative_to(WORKSPACE)
+                and path.resolve().is_relative_to(workspace)
             ):
-                files.append(path.relative_to(WORKSPACE).as_posix())
+                files.append(path.relative_to(workspace).as_posix())
 
     return files
 

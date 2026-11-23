@@ -8,6 +8,7 @@ from agent.planner import create_plan
 from agent.agent import run_agent
 from agent.reviewer import review_project
 from tools.files import read_file
+from tools.workspace import get_workspace, set_workspace
 
 MAX_REVIEW_ATTEMPTS = 3
 
@@ -65,10 +66,19 @@ def main(argv=None):
         "--model",
         help=f"Ollama model to use for planning, coding, and review (default: {DEFAULT_MODEL}).",
     )
+    parser.add_argument(
+        "--workspace",
+        default=os.environ.get("AGENT_WORKSPACE"),
+        help="Project folder the agent may inspect and modify (default: ./workspace).",
+    )
     args = parser.parse_args(argv)
 
     if args.model:
         os.environ["AGENT_MODEL"] = args.model.strip()
+
+    workspace = set_workspace(args.workspace) if args.workspace else get_workspace()
+    if args.workspace and not workspace.is_dir():
+        parser.error(f"Workspace folder does not exist: {workspace}")
 
     if args.request == ["-"]:
         request = sys.stdin.read().strip()
@@ -84,6 +94,7 @@ def main(argv=None):
         parser.error("The request cannot be empty.")
 
     print(f"\nUsing Ollama model: {get_model()}")
+    print(f"Working folder: {workspace}")
 
     print("\n================================")
     print("DEVELOPMENT PLAN")

@@ -1,11 +1,8 @@
 import os
 import subprocess
-from pathlib import Path
 
 from tools.render_sandbox import _session, execution_mode
-
-
-WORKSPACE = Path("workspace").resolve()
+from tools.workspace import get_workspace
 
 
 def run_command(command):
@@ -30,7 +27,7 @@ def run_command(command):
         result = subprocess.run(
             command,
             shell=True,
-            cwd=WORKSPACE,
+            cwd=get_workspace(),
             capture_output=True,
             text=True,
             timeout=30

@@ -10,7 +10,8 @@ import tarfile
 import tempfile
 from pathlib import Path, PurePosixPath
 
-from tools.files import IGNORED_DIRECTORIES, WORKSPACE
+from tools.files import IGNORED_DIRECTORIES
+from tools.workspace import get_workspace
 
 
 REMOTE_WORKSPACE = "/workspace"
@@ -47,10 +48,11 @@ def _is_sensitive_name(name: str) -> bool:
 
 
 def _copy_workspace_to_staging(destination: Path) -> None:
+    workspace = get_workspace()
     total = 0
-    for directory, child_directories, filenames in os.walk(WORKSPACE, followlinks=False):
+    for directory, child_directories, filenames in os.walk(workspace, followlinks=False):
         base = Path(directory)
-        relative_dir = base.relative_to(WORKSPACE)
+        relative_dir = base.relative_to(workspace)
         child_directories[:] = [
             name for name in child_directories
             if name.casefold() not in IGNORED_DIRECTORIES
@@ -210,13 +212,14 @@ class RenderSandboxSession:
 
 
 def _replace_workspace_files(source_root: Path, remote_files: set[str]) -> None:
-    WORKSPACE.mkdir(parents=True, exist_ok=True)
-    for directory, child_directories, filenames in os.walk(WORKSPACE, topdown=False):
+    workspace = get_workspace()
+    workspace.mkdir(parents=True, exist_ok=True)
+    for directory, child_directories, filenames in os.walk(workspace, topdown=False):
         base = Path(directory)
-        relative_dir = base.relative_to(WORKSPACE)
+        relative_dir = base.relative_to(workspace)
         for filename in filenames:
             path = base / filename
-            relative_path = path.relative_to(WORKSPACE)
+            relative_path = path.relative_to(workspace)
             relative = relative_path.as_posix()
             protected_parent = any(
                 part.casefold() in IGNORED_DIRECTORIES | IGNORED_SECRET_DIRECTORIES
@@ -241,8 +244,8 @@ def _replace_workspace_files(source_root: Path, remote_files: set[str]) -> None:
                 shutil.rmtree(path, ignore_errors=True)
     for relative in remote_files:
         source = source_root.joinpath(*PurePosixPath(relative).parts)
-        destination = WORKSPACE.joinpath(*PurePosixPath(relative).parts)
-        current = WORKSPACE
+        destination = workspace.joinpath(*PurePosixPath(relative).parts)
+        current = workspace
         for part in PurePosixPath(relative).parts[:-1]:
             current = current / part
             if current.is_symlink() or (current.exists() and not current.is_dir()):
